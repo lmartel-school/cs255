@@ -58,7 +58,10 @@ var keychain = function() {
     * Return Type: void
     */
   keychain.init = function(password) {
+    priv.data = {}, priv.secrets = {}, keychain = {}; // Clear all of the storage
     priv.data.version = "CS 255 Password Manager v1.0";
+    setup_cipher(password); // Set up the cipher lib
+    ready = true;
   };
 
   /**
@@ -79,6 +82,7 @@ var keychain = function() {
     * Return Type: boolean
     */
   keychain.load = function(password, repr, trusted_data_check) {
+    if(!ready) return false;
     throw "Not implemented!";
   };
 
