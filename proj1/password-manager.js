@@ -121,8 +121,9 @@ var keychain = function() {
       throw "Invalid keychain format";
     }
 
-    // Check master password correct
-    if(!bitarray_equal(data.master_salt_enc, HMAC(password, data.master_salt))) return false; // TODO explain/justify
+    // Check master password correct. This avoids leaking information about the master password because
+    // HMAC is provably immune to known-plaintext attacks.
+    if(!bitarray_equal(data.master_salt_enc, HMAC(password, data.master_salt))) return false;
 
     priv.data = data;
     generate_secrets(password);
