@@ -169,7 +169,7 @@ var keychain = function() {
     if(!(hmac in priv.data.passwords)) return null;
 
     var salt = priv.data.salts[hmac];
-    var salt_with_url = bitarray_concat(string_to_bitarray(name), salt);
+    var salt_with_url = bitarray_concat(hmac, salt);
     var salted_pw = dec_gcm(priv.secrets.cipher, priv.data.passwords[hmac]);
 
     var len = bitarray_len(salted_pw);
@@ -178,7 +178,7 @@ var keychain = function() {
     // Check for tampering. Including the url in the salt blocks swap attacks.
     if(!bitarray_equal(salt_with_url, bitarray_slice(salted_pw, salt_start, len))) throw "Corruption or tampering detected. Stop.";
 
-    return bitarray_to_string(bitarray_slice(salted_pw, 0, salt_start));
+    return string_from_padded_bitarray(bitarray_slice(salted_pw, 0, salt_start), 64);
 
   }
 
@@ -199,8 +199,8 @@ var keychain = function() {
 
     var hmac = HMAC(priv.secrets.master_key, name);
     var salt = priv.data.last_salt = SHA256(priv.data.last_salt);
-    var salt_with_url = bitarray_concat(string_to_bitarray(name), salt);
-    var salted_pw = bitarray_concat(string_to_bitarray(value), salt_with_url);
+    var salt_with_url = bitarray_concat(hmac, salt);
+    var salted_pw = bitarray_concat(string_to_padded_bitarray(value, 64), salt_with_url);
     var enc_pw = enc_gcm(priv.secrets.cipher, salted_pw);
 
     priv.data.salts[hmac] = salt;
