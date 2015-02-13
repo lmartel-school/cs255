@@ -57,9 +57,13 @@ var keychain = function() {
     priv.data.version = "CS 255 Password Manager v1.0";
   }
 
-  function generate_secrets(){
-    // TODO justify adding SHA256 here
-    priv.secrets.cipher = setup_cipher(bitarray_slice(SHA256(priv.data.master_key), 0, 128));
+  function generate_secrets(password){
+    // We SHA256 the master key before using it in AES, because the master key is also used for HMAC.
+    // We believe that using the same key for HMAC and AES does not jeopardize security,
+    // but using different keys avoids the issue altogether.
+    // This function is called only once per init/load so the slight extra runtime is not a concern.
+    priv.secrets.master_key = KDF(password, priv.data.master_salt);
+    priv.secrets.cipher = setup_cipher(bitarray_slice(SHA256(priv.secrets.master_key), 0, 128));
   }
 
   /* End helpers */
@@ -75,13 +79,15 @@ var keychain = function() {
   keychain.init = function(password) {
     clear();
 
-    priv.data.master_salt = random_bitarray(64); // TODO larger??
+    // 64 bits of salt is sufficient to make |raw password space| / [salted password space] = 1 / 2^64 negligible.
+    // We salt passwords with the corresponding domain name, so the fraction is actually even smaller.
+    priv.data.master_salt = random_bitarray(64);
     priv.data.last_salt = priv.data.master_salt;
     priv.data.passwords = {};
     priv.data.salts = {};
-    priv.data.master_key = KDF(password, priv.data.master_salt);
+    priv.data.master_salt_enc = HMAC(password, priv.data.master_salt);
 
-    generate_secrets();
+    generate_secrets(password);
 
     ready = true;
   };
@@ -116,10 +122,10 @@ var keychain = function() {
     }
 
     // Check master password correct
-    if(!bitarray_equal(data.master_key, KDF(password, data.master_salt))) return false; // TODO explain/justify
+    if(!bitarray_equal(data.master_salt_enc, HMAC(password, data.master_salt))) return false; // TODO explain/justify
 
     priv.data = data;
-    generate_secrets();
+    generate_secrets(password);
     ready = true;
 
     return true;
@@ -158,7 +164,7 @@ var keychain = function() {
   keychain.get = function(name) {
     if(!ready) throw "Keychain not initialized.";
 
-    var hmac = HMAC(priv.data.master_key, name);
+    var hmac = HMAC(priv.secrets.master_key, name);
     if(!(hmac in priv.data.passwords)) return null;
 
     var salt = priv.data.salts[hmac];
@@ -188,8 +194,9 @@ var keychain = function() {
   */
   keychain.set = function(name, value) {
     if(!ready) throw "Keychain not initialized.";
+    if(value.length > 64) throw "Password too long.";
 
-    var hmac = HMAC(priv.data.master_key, name);
+    var hmac = HMAC(priv.secrets.master_key, name);
     var salt = priv.data.last_salt = SHA256(priv.data.last_salt);
     var salt_with_url = bitarray_concat(string_to_bitarray(name), salt);
     var salted_pw = bitarray_concat(string_to_bitarray(value), salt_with_url);
@@ -209,9 +216,9 @@ var keychain = function() {
     * Return Type: boolean
   */
   keychain.remove = function(name) {
-    if(!ready) throw "Keychain not initialized."
+    if(!ready) throw "Keychain not initialized.";
 
-    var hmac = HMAC(priv.data.master_key, name);
+    var hmac = HMAC(priv.secrets.master_key, name);
     if(!(hmac in priv.data.passwords)) return false;
 
     delete priv.data.salts[hmac];

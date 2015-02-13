@@ -88,6 +88,11 @@ sneaky.load(password, JSON.stringify(tamper));
 should_throw(sneaky.get, "foo");
 should_throw(sneaky.get, tampered_key);
 
+var short_and_long = password_manager.keychain();
+short_and_long.init("password");
+short_and_long.set("foo.com", "a");
+should_throw(short_and_long.set, "bar.com", "foobarbazfoobarbazfoobarbazfoobarbazfoobarbazfoobarbazfoobarbazfoobarbazfoobarbazfoobarbazfoobarbazfoobarbazfoobarbaz");
+short_and_long.set("bar.com", "foobarbazfoobarbazfoobarbazfoobarbazfoobarbazfoobarbaz");
 
 console.log("All bonus tests passed.");
 
