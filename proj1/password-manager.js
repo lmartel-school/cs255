@@ -43,13 +43,28 @@ var keychain = function() {
 
   // Maximum length of each record in bytes
   var MAX_PW_LEN_BYTES = 64;
-  
+
   // Flag to indicate whether password manager is "ready" or not
   var ready = false;
 
   var keychain = {};
 
-  /** 
+  /* Private helpers */
+
+  function clear(){
+    ready = false;
+    priv.data = {}, priv.secrets = {};
+    priv.data.version = "CS 255 Password Manager v1.0";
+  }
+
+  function generate_secrets(){
+    // TODO justify adding SHA256 here
+    priv.secrets.cipher = setup_cipher(bitarray_slice(SHA256(priv.data.master_key), 0, 128));
+  }
+
+  /* End helpers */
+
+  /**
     * Creates an empty keychain with the given password. Once init is called,
     * the password manager should be in a ready state.
     *
@@ -58,9 +73,16 @@ var keychain = function() {
     * Return Type: void
     */
   keychain.init = function(password) {
-    priv.data = {}, priv.secrets = {}, keychain = {}; // Clear all of the storage
-    priv.data.version = "CS 255 Password Manager v1.0";
-    setup_cipher(password); // Set up the cipher lib
+    clear();
+
+    priv.data.master_salt = random_bitarray(64); // TODO larger??
+    priv.data.last_salt = priv.data.master_salt;
+    priv.data.passwords = {};
+    priv.data.salts = {};
+    priv.data.master_key = KDF(password, priv.data.master_salt);
+
+    generate_secrets();
+
     ready = true;
   };
 
@@ -68,10 +90,10 @@ var keychain = function() {
     * Loads the keychain state from the provided representation (repr). The
     * repr variable will contain a JSON encoded serialization of the contents
     * of the KVS (as returned by the save function). The trusted_data_check
-    * is an *optional* SHA-256 checksum that can be used to validate the 
+    * is an *optional* SHA-256 checksum that can be used to validate the
     * integrity of the contents of the KVS. If the checksum is provided and the
     * integrity check fails, an exception should be thrown. You can assume that
-    * the representation passed to load is well-formed (e.g., the result of a 
+    * the representation passed to load is well-formed (e.g., the result of a
     * call to the save function). Returns true if the data is successfully loaded
     * and the provided password is correct. Returns false otherwise.
     *
@@ -82,12 +104,29 @@ var keychain = function() {
     * Return Type: boolean
     */
   keychain.load = function(password, repr, trusted_data_check) {
-    if(!ready) return false;
-    throw "Not implemented!";
+    clear();
+
+    if(trusted_data_check && !bitarray_equal(trusted_data_check, SHA256(repr))) throw "Corruption or tampering detected. Stop.";
+
+    var data;
+    try {
+      data = JSON.parse(repr);
+    } catch(err) {
+      throw "Invalid keychain format";
+    }
+
+    // Check master password correct
+    if(!bitarray_equal(data.master_key, KDF(password, data.master_salt))) return false; // TODO explain/justify
+
+    priv.data = data;
+    generate_secrets();
+    ready = true;
+
+    return true;
   };
 
   /**
-    * Returns a JSON serialization of the contents of the keychain that can be 
+    * Returns a JSON serialization of the contents of the keychain that can be
     * loaded back using the load function. The return value should consist of
     * an array of two strings:
     *   arr[0] = JSON encoding of password manager
@@ -98,9 +137,12 @@ var keychain = function() {
     * password manager is not in a ready-state, return null.
     *
     * Return Type: array
-    */ 
+    */
   keychain.dump = function() {
-    throw "Not implemented!";
+    if(!ready) return null;
+
+    var contents = JSON.stringify(priv.data);
+    return [contents, SHA256(contents)];
   }
 
   /**
@@ -114,10 +156,26 @@ var keychain = function() {
     * Return Type: string
     */
   keychain.get = function(name) {
-    throw "Not implemented!";
+    if(!ready) throw "Keychain not initialized.";
+
+    var hmac = HMAC(priv.data.master_key, name);
+    if(!(hmac in priv.data.passwords)) return null;
+
+    var salt = priv.data.salts[hmac];
+    var salt_with_url = bitarray_concat(string_to_bitarray(name), salt);
+    var salted_pw = dec_gcm(priv.secrets.cipher, priv.data.passwords[hmac]);
+
+    var len = bitarray_len(salted_pw);
+    var salt_start = len - bitarray_len(salt_with_url);
+
+    // Check for tampering. Including the url in the salt blocks swap attacks.
+    if(!bitarray_equal(salt_with_url, bitarray_slice(salted_pw, salt_start, len))) throw "Corruption or tampering detected. Stop.";
+
+    return bitarray_to_string(bitarray_slice(salted_pw, 0, salt_start));
+
   }
 
-  /** 
+  /**
   * Inserts the domain and associated data into the KVS. If the domain is
   * already in the password manager, this method should update its value. If
   * not, create a new entry in the password manager. If the password manager is
@@ -129,7 +187,16 @@ var keychain = function() {
   * Return Type: void
   */
   keychain.set = function(name, value) {
-    throw "Not implemented!";
+    if(!ready) throw "Keychain not initialized.";
+
+    var hmac = HMAC(priv.data.master_key, name);
+    var salt = priv.data.last_salt = SHA256(priv.data.last_salt);
+    var salt_with_url = bitarray_concat(string_to_bitarray(name), salt);
+    var salted_pw = bitarray_concat(string_to_bitarray(value), salt_with_url);
+    var enc_pw = enc_gcm(priv.secrets.cipher, salted_pw);
+
+    priv.data.salts[hmac] = salt;
+    priv.data.passwords[hmac] = enc_pw;
   }
 
   /**
@@ -142,7 +209,14 @@ var keychain = function() {
     * Return Type: boolean
   */
   keychain.remove = function(name) {
-    throw "Not implemented!";
+    if(!ready) throw "Keychain not initialized."
+
+    var hmac = HMAC(priv.data.master_key, name);
+    if(!(hmac in priv.data.passwords)) return false;
+
+    delete priv.data.salts[hmac];
+    delete priv.data.passwords[hmac];
+    return true;
   }
 
   return keychain;
