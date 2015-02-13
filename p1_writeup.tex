@@ -1,0 +1,87 @@
+\documentclass{article}[12pt]
+\usepackage{color}
+\usepackage[normalem]{ulem}
+\usepackage{times}
+\usepackage{fullpage}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\def \R {\mathbb R}
+\def \imp {\Longrightarrow}
+\def \eps {\varepsilon}
+\def \Inf {{\sf Inf}}
+\newenvironment{proof}{{\bf Proof.  }}{\hfill$\Box$}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{definition}{Definition}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{claim}{Claim}[section]
+\setlength {\parskip}{2pt}
+\setlength{\parindent}{0pt}
+
+\newcommand{\headings}[4]{\noindent {\bf CS154: Introduction to Automata and
+Complexity Theory} \hfill {Winter 2015} \\
+{\noindent {\bf Homework} #1} \hfill {{\bf Due Date:} #2} \\
+
+\rule[0.1in]{\textwidth}{0.025in}
+}
+
+\newcommand{\klnote}[1]{{\color{red} #1}}
+\newcommand{\klsout}[1]{{\color{red} \sout{#1}}}
+
+% My custom stuff:
+\usepackage{tikz,enumerate}
+\newcommand{\soln}{\textbf{\newline Solution: }}
+\renewcommand{\emptyset}{\varnothing}
+\newcommand{\xor}{\bigoplus}
+
+\title{Programming Project 1 - Short Answers}
+\author{Leo Martel, Christine Li}
+\date{Friday, Feb 13, 2015}
+
+\begin{document}
+
+\maketitle
+
+\begin{enumerate}[1.]
+\item The adversary is prevented from learning information about the
+  lengths of the passwords because the passwords are all padded to 64
+  bytes (maximum password length), salted with HMAC(domain), which is
+  always 256 bits, and finally salted with a random additional salt of
+  constant length (64 bits). AES is a block cipher, so given a
+  fixed-size input will produce a fixed-size output. Therefore the
+  encrypted passwords are all the same length, and no length
+  information is leaked.
+
+\item We use the HMAC'd domain (the keyring key) as part of the
+  password (keyring value) salt. When $get(domain)$ is called, the
+  salted password is decrypted and the stored domain is compared to
+  the parameter. If the domain does not match, we throw a tampering
+  exception. Since a key-value store by definition only contains one
+  password for each domain, swap attacks are impossible.
+
+\item Yes, the trusted location is necessary. If we store the digest
+  on disk, an adversary could modify the database and then modify the
+  digest to match, causing our integrity check to produce a false
+  positive. For example, the adversary could successfully execute a
+  rollback attack by rolling back both the database and the digest to
+  corresponding earlier versions.
+
+\item Using another secure MAC would not jeopardize the security of
+  this system. Specifically, using an arbitrary secure MAC would not
+  reveal any information about the domains. As proved in class, secure
+  MACs are immune to chosen plaintext attacks. If an attacker could
+  mine information about the domains then they could use it to win the
+  secure MAC game by existential forgery.
+
+\item We could pad the password manager with bogus entries such that
+  it is always at its maximum capacity (or at some practical “large
+  enough” capacity). Before encryption, we could put in an indicator
+  in either the URL or password that indicates whether the entry is
+  real or fake. Thus, when adding a new entry, we could iterate
+  through all of the keys until we find a fake one, then delete
+  it. Then, we could add in our new entry to bring the total record
+  count back up to the maximum.
+
+\end{enumerate}
+
+\end{document}
