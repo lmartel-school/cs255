@@ -79,9 +79,9 @@ var keychain = function() {
   keychain.init = function(password) {
     clear();
 
-    // 64 bits of salt is sufficient to make |raw password space| / [salted password space] = 1 / 2^64 negligible.
+    // 64 bytes of salt is sufficient to make |raw password space| / [salted password space] = 1 / 2^64 negligible.
     // We salt passwords with the corresponding domain name, so the fraction is actually even smaller.
-    priv.data.master_salt = random_bitarray(64);
+    priv.data.master_salt = random_bitarray(64 * 8);
     priv.data.last_salt = priv.data.master_salt;
     priv.data.passwords = {};
     priv.data.salts = {};
