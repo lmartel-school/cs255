@@ -56,7 +56,7 @@ var client = function(client_sec_key_base64,
     };
 
     var valid_now = (Date.parse(crt.valid_from) < now) && (now < expiry);
-    var wont_expire = (expiry < expiry_theshold);
+    var wont_expire = (expiry > expiry_theshold);
     return valid_now && wont_expire && Object.keys(proper_subject).every(function(k){
       return crt.subject[k] == proper_subject[k];
     });
