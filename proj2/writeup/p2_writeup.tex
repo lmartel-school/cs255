@@ -34,7 +34,7 @@ Complexity Theory} \hfill {Winter 2015} \\
 \renewcommand{\emptyset}{\varnothing}
 \newcommand{\xor}{\bigoplus}
 
-\title{Programming Project 1 - Short Answers}
+\title{Programming Project 2 - Short Answers}
 \author{Leo Martel}
 \date{Wednesday, Mar 11, 2015}
 
@@ -48,12 +48,9 @@ Complexity Theory} \hfill {Winter 2015} \\
 
 \item By pinning $cs255ca.pem$, our client trusts the cs255 CA (and no other CA). Since the TLS client only accepts connections to servers with certificates signed by this CA, any server without such a cert will be rejected at the $tls.connect$ step. Thus the only possible issuer in the ``field validation'' step is $cs255ca$, which we trust has no reason to lie in its certificates, so we can safely assume the ``issuer'' field is correct without checking it.
 
-\item We could put the ``salt'' half of the private key directly into setup_cipher, rather than running it through the KDF with the password first. This would still run, since the salt is a length $128$ bitarray just like the sk_der is, but this implementation would ignore the client's password. The scheme would be vulnerable to an attacker compromising the client's computer and stealing their private key; the correct implementation requires that an attack also knows or guesses the client's password (which should not be stored anywhere on disk).
+\item We could put the ``salt'' half of the private key directly into setup-cipher, rather than running it through the KDF with the password first. This would still run, since the salt is a length $128$ bitarray just like the sk-der is, but this implementation would ignore the client's password. The scheme would be vulnerable to an attacker compromising the client's computer and stealing their private key; the correct implementation requires that an attack also knows or guesses the client's password (which should not be stored anywhere on disk).
 
-% TODO ANOTHER THING
-
-
-% TODO. AES key reuse?()
+Alternatively, an implementation might forget to salt the password, instead hashing password by itself to use as the cipher's secret key. To save cycles, the implementation might also write the hashed password to disk between runs, rather than recomputing it each time. In this case, the protocol would be vulnerable to a rainbow-table attack; if an attacker stole the hashed password, they could use a precomputed lookup table to potentially find the user's password, enabling them to attack the protocol without needing to guess or steal the password from the user separately.
 
 \item
 
